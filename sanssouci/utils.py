@@ -11,7 +11,7 @@ from .lambda_calibration import get_pivotal_stats
 from .reference_families import linear_template
 
 
-def get_data_driven_template_one_task(task):
+def get_data_driven_template_one_task(task, seed=42):
     """
     Get data driven template for a single task (generally vs baseline)
     """
@@ -45,10 +45,12 @@ def get_data_driven_template_one_task(task):
     return pval0_quantiles
 
 
-def get_data_driven_template_two_tasks(task1, task2):
+def get_data_driven_template_two_tasks(task1, task2, seed=42):
     """
     Get data-driven template for task1 vs task2
     """
+    np.random.RandomState(seed)
+
     B = 100
 
     data_path = get_data_dirs()[0]
@@ -160,7 +162,8 @@ def get_processed_input(task1, task2):
     return fmri_input, nifti_masker
 
 
-def calibrate_simes(fmri_input, alpha, k_min, k_max, B=100):
+def calibrate_simes(fmri_input, alpha, k_min, k_max, B=100, seed=42):
+    np.random.RandomState(seed)
     p = fmri_input.shape[1]
     pval0 = get_permuted_p_values_one_sample(fmri_input, B=B)
     piv_stat = get_pivotal_stats(pval0, K=k_max)
