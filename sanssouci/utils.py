@@ -83,7 +83,7 @@ def get_data_driven_template_two_tasks(task1, task2, B=100, seed=None):
 
     images_task2 = np.array(images_task2)
 
-    common_subj = list(set(subjects1) & set(subjects1))
+    common_subj = sorted(list(set(subjects1) & set(subjects1)))
     indices1 = [subjects1.index(common_subj[i]) for i in range(len(common_subj))]
     indices2 = [subjects2.index(common_subj[i]) for i in range(len(common_subj))]
 
@@ -142,7 +142,7 @@ def get_processed_input(task1, task2):
 
     images_task2 = np.array(images_task2)
 
-    common_subj = list(set(subjects1) & set(subjects1))
+    common_subj = sorted(list(set(subjects1) & set(subjects1)))
     indices1 = [subjects1.index(common_subj[i]) for i in range(len(common_subj))]
     indices2 = [subjects2.index(common_subj[i]) for i in range(len(common_subj))]
 
