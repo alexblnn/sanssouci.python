@@ -7,6 +7,14 @@ from .reference_families import inverse_linear_template
 from .reference_families import linear_template
 import warnings
 
+from sklearn.preprocessing import StandardScaler
+from sklearn.utils.validation import check_memory
+
+from hidimstat.knockoffs.gaussian_knockoff import (_estimate_distribution,
+                                                   gaussian_knockoff_generation)
+from hidimstat.knockoffs.stat_coef_diff import stat_coef_diff
+from hidimstat.knockoffs.knockoff_aggregation import _empirical_pval
+
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # LAMBDA-CALIBRATION
 # R source code: https://github.com/pneuvial/sanssouci/
@@ -193,7 +201,7 @@ def estimate_jer(template, pval0, k_max):
     B, p = pval0.shape
     id_ranks = np.tile(np.arange(0, p), (B, 1))
 
-    cutoffs = np.searchsorted(template, pval0)
+    cutoffs = np.searchsorted(template, pval0, side='right')
 
     signs = np.sign(id_ranks - cutoffs)
     sgn_trunc = signs[:, :k_max]
@@ -263,3 +271,88 @@ def calibrate_jer(alpha, learned_templates, pval0, k_max, min_dist=1):
         else:
             low = mid
     return learned_templates[low][:k_max]
+
+
+def get_knockoffs_p_values(X, labels, B=100, n_jobs=1,
+                           centered=True, shrink=False,
+                           offset=1, construct_method='equi',
+                           statistic='ridge', memory=None,
+                           cov_estimator='ledoit_wolf', seed=None):
+    """
+    Compute Knockoffs p-values as described in [1].
+
+    Parameters
+    ----------
+    X : array-like of shape (n,p)
+        numpy array of size [n,p], containing n observations of p variables
+        (hypotheses)
+    labels : array-like of shape (n,)
+        numpy array of size [n], containing n values in {0, 1}, each of them
+        specifying the column indices of the first and the second sample.
+    B : int
+        number of knockoffs draws to be performed (default=100)
+
+    Returns
+    -------
+    pval0 : array-like of shape (B, p)
+        A numpy array of size [B,p] with each row containing a vector of
+        p knockoff p-values
+    References
+    ----------
+    .. [1] Nguyen, T.B., Chevalier, J.A., Thirion, B. and Arlot, S.,
+           2020, November. Aggregation of multiple knockoffs.
+           In International Conference on Machine Learning
+           (pp. 7283-7293). PMLR.
+    """
+
+    if centered:
+        X = StandardScaler().fit_transform(X)
+
+    mu, Sigma = _estimate_distribution(
+        X, shrink=shrink, cov_estimator=cov_estimator)
+
+    mem = check_memory(memory)
+    stat_coef_diff_cached = mem.cache(stat_coef_diff,
+                                      ignore=['n_jobs', 'joblib_verbose'])
+
+    rng = check_random_state(seed)
+
+    seed_list = rng.randint(1, np.iinfo(np.int32).max, B)
+    parallel = Parallel(n_jobs)
+    X_tildes = parallel(delayed(gaussian_knockoff_generation)(
+        X, mu, Sigma, method=construct_method, memory=memory,
+        seed=seed) for seed in seed_list)
+
+    ko_stats = parallel(delayed(stat_coef_diff_cached)(
+        X, X_tildes[i], labels, method=statistic) for i in range(B))
+
+    pvals = np.array([_empirical_pval(ko_stats[i], offset)
+                      for i in range(B)])
+
+    pval0 = np.sort(pvals, axis=1)
+
+    if B == 1:
+        return pval0[0]
+    else:
+        return pval0
+
+
+def get_permuted_KO_p_values(X, labels, B=100,
+                             n_jobs=1, statistic='ridge',
+                             seed=None):
+    """
+    Permute labels and compute Knockoffs p-values
+    """
+
+    n, p = X.shape
+
+    shuffled_labels = labels.copy()
+
+    all_shuffled_labels = np.zeros((B, n))
+    for bb in range(B):
+        np.random.shuffle(shuffled_labels)
+        all_shuffled_labels[bb] = shuffled_labels
+
+    pval0 = get_knockoffs_p_values(X, labels, B=B, n_jobs=n_jobs,
+                                   statistic=statistic, seed=None)
+    return pval0
