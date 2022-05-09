@@ -61,7 +61,7 @@ def max_fp(p_values, thresholds):
 
     card = np.zeros(thresholds.shape[0])
     for i in range(thresholds.shape[0]):
-        card[i] = np.sum(p_values > thresholds[i])
+        card[i] = np.sum(p_values >= thresholds[i])
 
     return np.min([subset_size, (card + seq_k).min()])
 
