@@ -61,7 +61,7 @@ def max_fp(p_values, thresholds):
 
     card = np.zeros(thresholds.shape[0])
     for i in range(thresholds.shape[0]):
-        card[i] = np.sum(p_values > thresholds[i])
+        card[i] = np.sum(p_values >= thresholds[i])
 
     return np.min([subset_size, (card + seq_k).min()])
 
@@ -186,7 +186,7 @@ def curve_max_fp(p_values, thresholds):
     ii = 0
 
     while (kk < k_max) and (ii < p):
-        if thresholds[kk] >= p_values[ii]:
+        if thresholds[kk] > p_values[ii]:
             K[ii] = kk
             ii += 1
         else:
@@ -283,7 +283,7 @@ def find_largest_region(p_values, thresholds, tdp, masker=None):
         z_unmasked_cal = masker.inverse_transform(z_to_plot)
         return z_unmasked_cal, region_size
 
-    return region_size
+    return region_size, pval_cutoff
 
 
 def _compute_hommel_value(z_vals, alpha):
